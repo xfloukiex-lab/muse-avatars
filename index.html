@@ -370,22 +370,48 @@
   function paintCardCount(slug){
     var d = countsCache[slug]; if (!d) return;
     var l = document.getElementById('cl-' + slug), e = document.getElementById('cd-' + slug);
-    if (l && d.like !== null && d.like !== undefined) l.textContent = d.like;
-    if (e && d.dl !== null && d.dl !== undefined) e.textContent = d.dl;
+    if (l && typeof d.like === "number") l.textContent = d.like;
+    if (e && typeof d.dl === "number") e.textContent = d.dl;
+  }
+
+  /* Returns the counter value, 0 when the counter does not exist yet (404),
+     or null when the lookup failed (network/other HTTP error) so callers can
+     keep a known value instead of overwriting it with a fake 0. */
+  function fetchCount(key){
+    return fetch(CAPI + "/get/" + CNS + "/" + key, { cache: "no-store" })
+      .then(function(r){
+        if (r.status === 404) return 0;
+        if (!r.ok) return null;
+        return r.json().then(function(j){ return (typeof j.value === "number") ? j.value : null; });
+      })
+      .catch(function(){ return null; });
+  }
+  function hitCount(key){
+    return fetch(CAPI + "/hit/" + CNS + "/" + key, { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.json() : {}; })
+      .then(function(j){ return (typeof j.value === "number") ? j.value : null; })
+      .catch(function(){ return null; });
+  }
+
+  function cacheSet(slug, kind, v){
+    if (v === null || v === undefined) return;
+    countsCache[slug] = countsCache[slug] || {};
+    countsCache[slug][kind] = v;
+    paintCardCount(slug);
   }
 
   function loadGridCounts(list){
-    var need = list.filter(function(c){ return !countsCache[c.slug]; });
-    var BATCH = 16;
+    var need = list.filter(function(c){
+      var d = countsCache[c.slug];
+      return !d || typeof d.like !== "number" || typeof d.dl !== "number";
+    });
+    var BATCH = 12;
     (function next(){
       var batch = need.splice(0, BATCH);
       if (!batch.length) return;
       Promise.all(batch.map(function(c){
         return Promise.all([fetchCount("like-" + c.slug), fetchCount("dl-" + c.slug)])
-          .then(function(v){
-            countsCache[c.slug] = { like: v[0], dl: v[1] };
-            paintCardCount(c.slug);
-          });
+          .then(function(v){ cacheSet(c.slug, "like", v[0]); cacheSet(c.slug, "dl", v[1]); });
       })).then(next);
     })();
     list.forEach(function(c){ paintCardCount(c.slug); });
@@ -403,55 +429,47 @@
   }
   function isLiked(slug){ return likedSet().indexOf(slug) >= 0; }
 
-  function fetchCount(key){
-    return fetch(CAPI + "/get/" + CNS + "/" + key)
-      .then(function(r){ return r.ok ? r.json() : { value: 0 }; })
-      .then(function(j){ return (typeof j.value === "number") ? j.value : 0; })
-      .catch(function(){ return 0; });
-  }
-  function hitCount(key){
-    return fetch(CAPI + "/hit/" + CNS + "/" + key)
-      .then(function(r){ return r.ok ? r.json() : {}; })
-      .then(function(j){ return (typeof j.value === "number") ? j.value : null; })
-      .catch(function(){ return null; });
-  }
-
   function renderCounts(){
     var c = current; if (!c) return;
-    likeCountEl.textContent = (counts.like === null) ? "…" : counts.like;
+    likeCountEl.textContent = (counts.like === null) ? "\u2026" : counts.like;
     dlCountEl.textContent = (counts.dl === null) ? "" :
-      "⬇ " + counts.dl + (counts.dl === 1 ? " download" : " downloads");
+      "\u2b07 " + counts.dl + (counts.dl === 1 ? " download" : " downloads");
     var liked = isLiked(c.slug);
     likeBtn.classList.toggle('liked', liked);
     likeBtn.disabled = liked;
     document.getElementById('likeLabel').textContent = liked ? "Liked" : "Like";
   }
 
+  function loadOne(slug, kind, attempt){
+    fetchCount(kind + "-" + slug).then(function(v){
+      if (v === null){
+        if (attempt < 2) setTimeout(function(){ loadOne(slug, kind, attempt + 1); }, 1200);
+        return;
+      }
+      cacheSet(slug, kind, v);
+      if (current && current.slug === slug){ counts[kind] = v; renderCounts(); }
+    });
+  }
+
   function loadCounts(c){
-    counts = { like: null, dl: null };
+    var cached = countsCache[c.slug] || {};
+    counts = {
+      like: (typeof cached.like === "number") ? cached.like : null,
+      dl: (typeof cached.dl === "number") ? cached.dl : null
+    };
     renderCounts();
-    var slug = c.slug;
-    fetchCount("like-" + slug).then(function(v){
-      countsCache[slug] = countsCache[slug] || {}; countsCache[slug].like = v; paintCardCount(slug);
-      if (current && current.slug === slug){ counts.like = v; renderCounts(); }
-    });
-    fetchCount("dl-" + slug).then(function(v){
-      countsCache[slug] = countsCache[slug] || {}; countsCache[slug].dl = v; paintCardCount(slug);
-      if (current && current.slug === slug){ counts.dl = v; renderCounts(); }
-    });
+    loadOne(c.slug, "like", 0);
+    loadOne(c.slug, "dl", 0);
   }
 
   likeBtn.addEventListener('click', function(){
     var c = current; if (!c || isLiked(c.slug)) return;
     markLiked(c.slug);
-    if (counts.like !== null) counts.like += 1;
-    countsCache[c.slug] = countsCache[c.slug] || {};
-    if (typeof countsCache[c.slug].like === "number") countsCache[c.slug].like += 1;
-    paintCardCount(c.slug);
+    if (counts.like !== null){ counts.like += 1; cacheSet(c.slug, "like", counts.like); }
     renderCounts();
     hitCount("like-" + c.slug).then(function(v){
       if (v !== null){
-        countsCache[c.slug] = countsCache[c.slug] || {}; countsCache[c.slug].like = v; paintCardCount(c.slug);
+        cacheSet(c.slug, "like", v);
         if (current && current.slug === c.slug){ counts.like = v; renderCounts(); }
       }
     });
@@ -459,10 +477,8 @@
 
   function countDownload(){
     var c = current; if (!c) return;
-    if (counts.dl !== null){ counts.dl += 1; renderCounts(); }
-    countsCache[c.slug] = countsCache[c.slug] || {};
-    if (typeof countsCache[c.slug].dl === "number"){ countsCache[c.slug].dl += 1; paintCardCount(c.slug); }
-    hitCount("dl-" + c.slug);
+    if (counts.dl !== null){ counts.dl += 1; cacheSet(c.slug, "dl", counts.dl); renderCounts(); }
+    hitCount("dl-" + c.slug).then(function(v){ if (v !== null) cacheSet(c.slug, "dl", v); });
   }
   document.getElementById('dlPortrait').addEventListener('click', countDownload);
   document.getElementById('dlSheet').addEventListener('click', countDownload);
