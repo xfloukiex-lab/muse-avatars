@@ -80,6 +80,15 @@
       padding:12px 20px;border-radius:999px;font-size:15px}
   .dl.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
   .dl:hover{opacity:.88}
+  .engage{display:flex;align-items:center;gap:14px;margin-top:20px;flex-wrap:wrap}
+  .likebtn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;
+           padding:10px 18px;cursor:pointer;font-size:15px;font-weight:600;transition:all .15s}
+  .likebtn:hover{border-color:#e2543e}
+  .likebtn .heart{color:#c9beb2;font-size:17px}
+  .likebtn.liked{border-color:#e2543e;background:#fdf0ec}
+  .likebtn.liked .heart{color:#e2543e}
+  .likebtn:disabled{cursor:default;opacity:.85}
+  .dlcount{color:var(--muted);font-size:14px}
   .charnav{display:flex;justify-content:space-between;align-items:center;margin-top:26px}
   .charnav button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 16px;cursor:pointer;font-size:14px}
   .charnav .cc{color:var(--muted);font-size:14px}
@@ -131,6 +140,10 @@
           <a class="dl" id="dlPortrait" href="#" download>&#11015; Download portrait</a>
           <a class="dl alt" id="dlSheet" href="#" download>&#11015; Download turnaround sheet</a>
         </div>
+        <div class="engage">
+          <button class="likebtn" id="likeBtn"><span class="heart">&#9829;</span> <span id="likeLabel">Like</span> &middot; <span id="likeCount">&hellip;</span></button>
+          <span class="dlcount" id="dlCount"></span>
+        </div>
         <div class="charnav">
           <button id="charPrev"></button>
           <span class="cc" id="charCount"></span>
@@ -144,6 +157,7 @@
 <footer>
   Muse Avatars — choose your core.<br>
   Every portrait is free to download and use as your avatar.<br>
+  <a href="stats.html" style="color:var(--accent)">See which companions are most loved &rarr;</a><br>
   An unofficial, fan-made pack — not affiliated with Meta.
 </footer>
 
@@ -299,6 +313,7 @@
     document.getElementById('charPrev').innerHTML = "&larr; " + visible[(idx-1+visible.length)%visible.length].name;
     document.getElementById('charNext').innerHTML = visible[(idx+1)%visible.length].name + " &rarr;";
     renderSpin();
+    loadCounts(c);
     window.scrollTo(0,0);
   }
 
@@ -336,6 +351,76 @@
     if (e.key==="ArrowRight"){ step=(step+1)%4; renderSpin(); }
     if (e.key==="Escape") closeDetail();
   });
+
+  /* ---------- likes & download counts (Abacus counter service) ---------- */
+  var CAPI = "https://abacus.jasoncameron.dev";
+  var CNS = "xfloukiex-muse-avatars";
+  var likeBtn = document.getElementById('likeBtn'),
+      likeCountEl = document.getElementById('likeCount'),
+      dlCountEl = document.getElementById('dlCount');
+  var counts = { like: null, dl: null };
+
+  function likedSet(){
+    try { return JSON.parse(localStorage.getItem('ma_likes_v1') || "[]"); }
+    catch(e){ return []; }
+  }
+  function markLiked(slug){
+    try {
+      var s = likedSet();
+      if (s.indexOf(slug) < 0){ s.push(slug); localStorage.setItem('ma_likes_v1', JSON.stringify(s)); }
+    } catch(e){}
+  }
+  function isLiked(slug){ return likedSet().indexOf(slug) >= 0; }
+
+  function fetchCount(key){
+    return fetch(CAPI + "/get/" + CNS + "/" + key)
+      .then(function(r){ return r.ok ? r.json() : { value: 0 }; })
+      .then(function(j){ return (typeof j.value === "number") ? j.value : 0; })
+      .catch(function(){ return 0; });
+  }
+  function hitCount(key){
+    return fetch(CAPI + "/hit/" + CNS + "/" + key)
+      .then(function(r){ return r.ok ? r.json() : {}; })
+      .then(function(j){ return (typeof j.value === "number") ? j.value : null; })
+      .catch(function(){ return null; });
+  }
+
+  function renderCounts(){
+    var c = current; if (!c) return;
+    likeCountEl.textContent = (counts.like === null) ? "…" : counts.like;
+    dlCountEl.textContent = (counts.dl === null) ? "" :
+      "⬇ " + counts.dl + (counts.dl === 1 ? " download" : " downloads");
+    var liked = isLiked(c.slug);
+    likeBtn.classList.toggle('liked', liked);
+    likeBtn.disabled = liked;
+    document.getElementById('likeLabel').textContent = liked ? "Liked" : "Like";
+  }
+
+  function loadCounts(c){
+    counts = { like: null, dl: null };
+    renderCounts();
+    var slug = c.slug;
+    fetchCount("like-" + slug).then(function(v){ if (current && current.slug === slug){ counts.like = v; renderCounts(); } });
+    fetchCount("dl-" + slug).then(function(v){ if (current && current.slug === slug){ counts.dl = v; renderCounts(); } });
+  }
+
+  likeBtn.addEventListener('click', function(){
+    var c = current; if (!c || isLiked(c.slug)) return;
+    markLiked(c.slug);
+    if (counts.like !== null) counts.like += 1;
+    renderCounts();
+    hitCount("like-" + c.slug).then(function(v){
+      if (v !== null && current && current.slug === c.slug){ counts.like = v; renderCounts(); }
+    });
+  });
+
+  function countDownload(){
+    var c = current; if (!c) return;
+    if (counts.dl !== null){ counts.dl += 1; renderCounts(); }
+    hitCount("dl-" + c.slug);
+  }
+  document.getElementById('dlPortrait').addEventListener('click', countDownload);
+  document.getElementById('dlSheet').addEventListener('click', countDownload);
 
   apply();
 })();
