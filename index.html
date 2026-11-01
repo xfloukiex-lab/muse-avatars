@@ -41,6 +41,10 @@
   .card .type{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;font-weight:600;
               border:1px solid var(--line);border-radius:999px;padding:2px 9px}
   .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .card .ccounts{display:flex;gap:13px;border-top:1px solid var(--line);margin-top:9px;padding-top:8px;
+                 color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+  .card .ccounts .h{color:#e2543e}
+  .card .ccounts b{font-weight:600;color:var(--ink)}
   /* ---------- detail ---------- */
   #detail{display:none}
   #detail.show{display:block}
@@ -157,7 +161,6 @@
 <footer>
   Muse Avatars — choose your core.<br>
   Every portrait is free to download and use as your avatar.<br>
-  <a href="stats.html" style="color:var(--accent)">See which companions are most loved &rarr;</a><br>
   An unofficial, fan-made pack — not affiliated with Meta.
 </footer>
 
@@ -238,11 +241,14 @@
           String(c.n).padStart(2,"0") + '</span></div>' +
         '<div class="meta"><div class="name">' + c.name + '</div>' +
         '<div class="species">' + c.species + '</div>' +
-        '<span class="type"><span class="dot" style="background:' + c.color + '"></span>' + c.type + '</span></div>';
+        '<span class="type"><span class="dot" style="background:' + c.color + '"></span>' + c.type + '</span>' +
+        '<div class="ccounts"><span><span class="h">&#9829;</span> <b id="cl-' + c.slug + '">&ndash;</b></span>' +
+        '<span>&#11015; <b id="cd-' + c.slug + '">&ndash;</b></span></div></div>';
       card.querySelector('img').src = c.portrait;
       card.onclick = function(){ openDetail(c); };
       grid.appendChild(card);
     });
+    loadGridCounts(visible);
   }
 
   /* ---------- detail / spin ---------- */
@@ -359,6 +365,31 @@
       likeCountEl = document.getElementById('likeCount'),
       dlCountEl = document.getElementById('dlCount');
   var counts = { like: null, dl: null };
+  var countsCache = {};   // slug -> {like, dl}, shared by grid cards and detail view
+
+  function paintCardCount(slug){
+    var d = countsCache[slug]; if (!d) return;
+    var l = document.getElementById('cl-' + slug), e = document.getElementById('cd-' + slug);
+    if (l && d.like !== null && d.like !== undefined) l.textContent = d.like;
+    if (e && d.dl !== null && d.dl !== undefined) e.textContent = d.dl;
+  }
+
+  function loadGridCounts(list){
+    var need = list.filter(function(c){ return !countsCache[c.slug]; });
+    var BATCH = 16;
+    (function next(){
+      var batch = need.splice(0, BATCH);
+      if (!batch.length) return;
+      Promise.all(batch.map(function(c){
+        return Promise.all([fetchCount("like-" + c.slug), fetchCount("dl-" + c.slug)])
+          .then(function(v){
+            countsCache[c.slug] = { like: v[0], dl: v[1] };
+            paintCardCount(c.slug);
+          });
+      })).then(next);
+    })();
+    list.forEach(function(c){ paintCardCount(c.slug); });
+  }
 
   function likedSet(){
     try { return JSON.parse(localStorage.getItem('ma_likes_v1') || "[]"); }
@@ -400,23 +431,37 @@
     counts = { like: null, dl: null };
     renderCounts();
     var slug = c.slug;
-    fetchCount("like-" + slug).then(function(v){ if (current && current.slug === slug){ counts.like = v; renderCounts(); } });
-    fetchCount("dl-" + slug).then(function(v){ if (current && current.slug === slug){ counts.dl = v; renderCounts(); } });
+    fetchCount("like-" + slug).then(function(v){
+      countsCache[slug] = countsCache[slug] || {}; countsCache[slug].like = v; paintCardCount(slug);
+      if (current && current.slug === slug){ counts.like = v; renderCounts(); }
+    });
+    fetchCount("dl-" + slug).then(function(v){
+      countsCache[slug] = countsCache[slug] || {}; countsCache[slug].dl = v; paintCardCount(slug);
+      if (current && current.slug === slug){ counts.dl = v; renderCounts(); }
+    });
   }
 
   likeBtn.addEventListener('click', function(){
     var c = current; if (!c || isLiked(c.slug)) return;
     markLiked(c.slug);
     if (counts.like !== null) counts.like += 1;
+    countsCache[c.slug] = countsCache[c.slug] || {};
+    if (typeof countsCache[c.slug].like === "number") countsCache[c.slug].like += 1;
+    paintCardCount(c.slug);
     renderCounts();
     hitCount("like-" + c.slug).then(function(v){
-      if (v !== null && current && current.slug === c.slug){ counts.like = v; renderCounts(); }
+      if (v !== null){
+        countsCache[c.slug] = countsCache[c.slug] || {}; countsCache[c.slug].like = v; paintCardCount(c.slug);
+        if (current && current.slug === c.slug){ counts.like = v; renderCounts(); }
+      }
     });
   });
 
   function countDownload(){
     var c = current; if (!c) return;
     if (counts.dl !== null){ counts.dl += 1; renderCounts(); }
+    countsCache[c.slug] = countsCache[c.slug] || {};
+    if (typeof countsCache[c.slug].dl === "number"){ countsCache[c.slug].dl += 1; paintCardCount(c.slug); }
     hitCount("dl-" + c.slug);
   }
   document.getElementById('dlPortrait').addEventListener('click', countDownload);
