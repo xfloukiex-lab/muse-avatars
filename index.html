@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Muse Avatars — Choose Your Core</title>
-<meta name="description" content="Muse Avatars: 119 free, original avatar companions. Choose your core — browse, download a portrait, and use it as your Muse avatar.">
+<title>Muse Avatars — Find Your Core Companion</title>
+<meta name="description" content="Muse Avatars: 119 original avatar companions. Find your core companion — browse the pack and meet each one. Full packs live at UrAgentAvatar.">
 <link rel="canonical" href="https://xfloukiex-lab.github.io/muse-avatars/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Muse Avatars">
-<meta property="og:title" content="Muse Avatars — Choose Your Core">
-<meta property="og:description" content="Avatar suggestions for Muse: 119 free, original companions. Browse the pack, download a portrait, use it as your Muse avatar. An unofficial fan project, not affiliated with or endorsed by Meta.">
+<meta property="og:title" content="Muse Avatars — Find Your Core Companion">
+<meta property="og:description" content="Avatar suggestions for Muse: 119 original companions. Browse the pack and find your core companion. Full packs live at UrAgentAvatar. An unofficial fan project, not affiliated with or endorsed by Meta.">
 <meta property="og:url" content="https://xfloukiex-lab.github.io/muse-avatars/">
 <meta property="og:image" content="https://xfloukiex-lab.github.io/muse-avatars/assets/portraits/mochi.webp">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Muse Avatars — Choose Your Core">
+<meta name="twitter:title" content="Muse Avatars — Find Your Core Companion">
 <meta name="twitter:description" content="Avatar suggestions for Muse: 119 free, original companions. An unofficial fan project, not affiliated with or endorsed by Meta.">
 <style>
   :root{
@@ -112,10 +112,10 @@
 <body>
 <header>
   <h1>Muse <span class="core">Avatars</span></h1>
-  <p style="font-size:19px;color:var(--ink);font-weight:600;margin-top:6px">Choose your core</p>
-<p style="font-size:13px;color:var(--muted);margin-top:8px">Avatar suggestions for Muse — an unofficial fan project, not affiliated with or endorsed by Meta.</p>
+  <p style="font-size:19px;color:var(--ink);font-weight:600;margin-top:6px">Find your core companion</p>
+  <p style="font-size:13px;color:var(--muted);margin-top:8px">Avatar suggestions for Muse — an unofficial fan project, not affiliated with or endorsed by Meta.</p>
   <p>119 companions, each holding the core that makes them <em>them</em>.
-     Browse the pack, click the one that feels like yours, and download its portrait — free to use as your Muse avatar.</p>
+     Browse the pack, click the one that feels like yours. Full packs — the portrait, the turnaround sheet, and each companion's own outfit and scene — live at <a href="https://uragentavatar.pages.dev">UrAgentAvatar</a>.</p>
 </header>
 
 <div class="wrap">
@@ -152,12 +152,10 @@
         <p class="line" id="dLine"></p>
         <table class="attrs" id="dAttrs"></table>
         <div class="downloads">
-          <a class="dl" id="dlPortrait" href="#" download>&#11015; Download portrait</a>
-          <a class="dl alt" id="dlSheet" href="#" download>&#11015; Download turnaround sheet</a>
+          <a class="dl" href="https://uragentavatar.pages.dev" target="_blank" rel="noopener">Get the full pack at UrAgentAvatar</a>
         </div>
         <div class="engage">
           <button class="likebtn" id="likeBtn"><span class="heart">&#9829;</span> <span id="likeLabel">Like</span> &middot; <span id="likeCount">&hellip;</span></button>
-          <span class="dlcount" id="dlCount"></span>
         </div>
         <div class="charnav">
           <button id="charPrev"></button>
@@ -170,8 +168,8 @@
 </div>
 
 <footer>
-  Muse Avatars — choose your core.<br>
-  Every portrait is free to download and use as your avatar.<br>
+  Muse Avatars — find your core companion.<br>
+  Full-size portraits and complete packs live at <a href="https://uragentavatar.pages.dev">UrAgentAvatar</a>.<br>
   An unofficial, fan-made pack — not affiliated with Meta.
 </footer>
 
@@ -253,8 +251,7 @@
         '<div class="meta"><div class="name">' + c.name + '</div>' +
         '<div class="species">' + c.species + '</div>' +
         '<span class="type"><span class="dot" style="background:' + c.color + '"></span>' + c.type + '</span>' +
-        '<div class="ccounts"><span><span class="h">&#9829;</span> <b id="cl-' + c.slug + '">&ndash;</b></span>' +
-        '<span>&#11015; <b id="cd-' + c.slug + '">&ndash;</b></span></div></div>';
+        '<div class="ccounts"><span><span class="h">&#9829;</span> <b id="cl-' + c.slug + '">&ndash;</b></span></div></div>';
       card.querySelector('img').src = c.portrait;
       card.onclick = function(){ openDetail(c); };
       grid.appendChild(card);
@@ -321,10 +318,6 @@
     document.getElementById('dAttrs').innerHTML = rows.map(function(r){
       return "<tr><td class='k'>" + r[0] + "</td><td>" + r[1] + "</td></tr>";
     }).join("");
-    var dlP = document.getElementById('dlPortrait');
-    dlP.href = c.portrait; dlP.setAttribute('download', c.slug + '-portrait.webp');
-    var dlS = document.getElementById('dlSheet');
-    dlS.href = c.sheet; dlS.setAttribute('download', c.slug + '-turnaround.webp');
     var idx = visible.indexOf(c);
     document.getElementById('charCount').textContent = (idx+1) + " of " + visible.length + " shown";
     document.getElementById('charPrev').innerHTML = "&larr; " + visible[(idx-1+visible.length)%visible.length].name;
@@ -369,20 +362,18 @@
     if (e.key==="Escape") closeDetail();
   });
 
-  /* ---------- likes & download counts (Abacus counter service) ---------- */
+  /* ---------- like counts (Abacus counter service) ---------- */
   var CAPI = "https://abacus.jasoncameron.dev";
   var CNS = "xfloukiex-muse-avatars";
   var likeBtn = document.getElementById('likeBtn'),
-      likeCountEl = document.getElementById('likeCount'),
-      dlCountEl = document.getElementById('dlCount');
-  var counts = { like: null, dl: null };
-  var countsCache = {};   // slug -> {like, dl}, shared by grid cards and detail view
+      likeCountEl = document.getElementById('likeCount');
+  var counts = { like: null };
+  var countsCache = {};   // slug -> {like}, shared by grid cards and detail view
 
   function paintCardCount(slug){
     var d = countsCache[slug]; if (!d) return;
-    var l = document.getElementById('cl-' + slug), e = document.getElementById('cd-' + slug);
+    var l = document.getElementById('cl-' + slug);
     if (l && typeof d.like === "number") l.textContent = d.like;
-    if (e && typeof d.dl === "number") e.textContent = d.dl;
   }
 
   /* Returns the counter value, 0 when the counter does not exist yet (404),
@@ -414,15 +405,15 @@
   function loadGridCounts(list){
     var need = list.filter(function(c){
       var d = countsCache[c.slug];
-      return !d || typeof d.like !== "number" || typeof d.dl !== "number";
+      return !d || typeof d.like !== "number";
     });
     var BATCH = 12;
     (function next(){
       var batch = need.splice(0, BATCH);
       if (!batch.length) return;
       Promise.all(batch.map(function(c){
-        return Promise.all([fetchCount("like-" + c.slug), fetchCount("dl-" + c.slug)])
-          .then(function(v){ cacheSet(c.slug, "like", v[0]); cacheSet(c.slug, "dl", v[1]); });
+        return fetchCount("like-" + c.slug)
+          .then(function(v){ cacheSet(c.slug, "like", v); });
       })).then(next);
     })();
     list.forEach(function(c){ paintCardCount(c.slug); });
@@ -443,8 +434,6 @@
   function renderCounts(){
     var c = current; if (!c) return;
     likeCountEl.textContent = (counts.like === null) ? "\u2026" : counts.like;
-    dlCountEl.textContent = (counts.dl === null) ? "" :
-      "\u2b07 " + counts.dl + (counts.dl === 1 ? " download" : " downloads");
     var liked = isLiked(c.slug);
     likeBtn.classList.toggle('liked', liked);
     likeBtn.disabled = liked;
@@ -464,13 +453,9 @@
 
   function loadCounts(c){
     var cached = countsCache[c.slug] || {};
-    counts = {
-      like: (typeof cached.like === "number") ? cached.like : null,
-      dl: (typeof cached.dl === "number") ? cached.dl : null
-    };
+    counts = { like: (typeof cached.like === "number") ? cached.like : null };
     renderCounts();
     loadOne(c.slug, "like", 0);
-    loadOne(c.slug, "dl", 0);
   }
 
   likeBtn.addEventListener('click', function(){
@@ -485,14 +470,6 @@
       }
     });
   });
-
-  function countDownload(){
-    var c = current; if (!c) return;
-    if (counts.dl !== null){ counts.dl += 1; cacheSet(c.slug, "dl", counts.dl); renderCounts(); }
-    hitCount("dl-" + c.slug).then(function(v){ if (v !== null) cacheSet(c.slug, "dl", v); });
-  }
-  document.getElementById('dlPortrait').addEventListener('click', countDownload);
-  document.getElementById('dlSheet').addEventListener('click', countDownload);
 
   apply();
 })();
